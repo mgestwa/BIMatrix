@@ -1,3 +1,5 @@
+// Aktualizacja main.js z dodaniem eksportu właściwości
+
 // Importowanie niezbędnych modułów
 import * as WEBIFC from "web-ifc";
 import * as BUI from "@thatopen/ui";
@@ -5,12 +7,13 @@ import * as OBC from "@thatopen/components";
 import * as OBF from "@thatopen/components-front";
 import * as CUI from "@thatopen/ui-obc";
 
-
 BUI.Manager.init();
 
 // Inicjalizacja komponentów
 const components = new OBC.Components();
 const ifcLoader = components.get(OBC.IfcLoader);
+
+let currentProperties = {}; // Zmienna globalna do przechowywania właściwości
 
 // Funkcja do konfiguracji i wczytania pliku IFC oraz inicjalizacji tabeli właściwości
 async function loadIfcWithProperties(file) {
@@ -70,11 +73,22 @@ async function setupElementProperties(model, components, world) {
     // Obsługa zdarzeń podświetlania
     highlighter.events.select.onHighlight.add((fragmentIdMap) => {
         updatePropertiesTable({ fragmentIdMap });
+        currentProperties = propertiesTable.downloadData("test.json", "json"); // Przechowuj właściwości w zmiennej
     });
 
     highlighter.events.select.onClear.add(() => {
         updatePropertiesTable({ fragmentIdMap: {} });
+        currentProperties = {}; // Czyszczenie właściwości
     });
+}
+
+// Funkcja do eksportu właściwości do pliku JSON
+function exportPropertiesToJson() {
+    if (propertiesTable) {
+        propertiesTable.downloadData("properties", "json");
+    } else {
+        console.error("Tabela właściwości nie jest zainicjalizowana.");
+    }
 }
 
 // Obsługa zdarzenia wyboru pliku z obsługą tabeli właściwości
@@ -90,3 +104,6 @@ document.getElementById("ifcFile").addEventListener("change", async (event) => {
         console.error("Nie wybrano pliku.");
     }
 });
+
+// Dodanie obsługi przycisku do eksportu JSON
+document.getElementById("downloadJson").addEventListener("click", exportPropertiesToJson);
