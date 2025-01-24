@@ -47,16 +47,21 @@ async function loadIfcWithProperties(file) {
     await setupElementProperties(model, components, world);
 }
 
+let propertiesTable; // Zmienna globalna, aby uzyskać dostęp do tabeli właściwości
+
 // Funkcja do inicjalizacji tabeli właściwości
 async function setupElementProperties(model, components, world) {
     const indexer = components.get(OBC.IfcRelationsIndexer);
     await indexer.process(model);
 
-    const [propertiesTable, updatePropertiesTable] = CUI.tables.elementProperties({
+    const [tableComponent, updatePropertiesTable] = CUI.tables.elementProperties({
         components,
         fragmentIdMap: {},
     });
 
+    // Assign to global propertiesTable
+    propertiesTable = tableComponent;
+    
     propertiesTable.preserveStructureOnFilter = true;
     propertiesTable.indentationInText = false;
 
@@ -73,7 +78,7 @@ async function setupElementProperties(model, components, world) {
     // Obsługa zdarzeń podświetlania
     highlighter.events.select.onHighlight.add((fragmentIdMap) => {
         updatePropertiesTable({ fragmentIdMap });
-        currentProperties = propertiesTable.downloadData("test.json", "json"); // Przechowuj właściwości w zmiennej
+        //currentProperties = propertiesTable.downloadData("test.json", "json"); // Przechowuj właściwości w zmiennej
     });
 
     highlighter.events.select.onClear.add(() => {
@@ -82,14 +87,19 @@ async function setupElementProperties(model, components, world) {
     });
 }
 
-// Funkcja do eksportu właściwości do pliku JSON
+// Funkcja do eksportowania danych do JSON
 function exportPropertiesToJson() {
     if (propertiesTable) {
-        propertiesTable.downloadData("properties", "json");
+        propertiesTable.downloadData("selectedElementData.json", "json");
+        console.log("Eksport danych do JSON z tabeli właściwości.");
     } else {
-        console.error("Tabela właściwości nie jest zainicjalizowana.");
+        alert("Tabela właściwości nie została zainicjalizowana.");
+        console.error("Tabela właściwości jest niezainicjalizowana.");
     }
 }
+
+// Przypisanie event listener do przycisku
+document.getElementById("downloadJson").addEventListener("click", exportPropertiesToJson);
 
 // Obsługa zdarzenia wyboru pliku z obsługą tabeli właściwości
 document.getElementById("ifcFile").addEventListener("change", async (event) => {
@@ -104,6 +114,3 @@ document.getElementById("ifcFile").addEventListener("change", async (event) => {
         console.error("Nie wybrano pliku.");
     }
 });
-
-// Dodanie obsługi przycisku do eksportu JSON
-document.getElementById("downloadJson").addEventListener("click", exportPropertiesToJson);
