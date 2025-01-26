@@ -75,31 +75,82 @@ async function setupElementProperties(model, components, world) {
     const highlighter = components.get(OBF.Highlighter);
     highlighter.setup({ world });
 
-    // Obsługa zdarzeń podświetlania
-    highlighter.events.select.onHighlight.add((fragmentIdMap) => {
+    highlighter.events.select.onHighlight.add(async (fragmentIdMap) => {
         updatePropertiesTable({ fragmentIdMap });
-        //currentProperties = propertiesTable.downloadData("test.json", "json"); // Przechowuj właściwości w zmiennej
+    
+        // Pobierz expressIDs z fragmentIdMap
+        const expressIDs = [];
+        for (const fragmentID in fragmentIdMap) {
+            const ids = fragmentIdMap[fragmentID];
+            expressIDs.push(...ids);
+        }
+    
+        currentProperties = {}; // Reset current properties
+    
+        // Pobierz właściwości dla każdego expressID bezpośrednio z modelu
+        for (const expressID of expressIDs) {
+            try {
+                const props = await model.getProperties(expressID); // Poprawione wywołanie
+                currentProperties[expressID] = props;
+            } catch (error) {
+                console.error(`Błąd podczas pobierania właściwości dla ExpressID ${expressID}:`, error);
+            }
+        }
+    
+        console.log("Zaktualizowane właściwości:", currentProperties);
     });
 
     highlighter.events.select.onClear.add(() => {
         updatePropertiesTable({ fragmentIdMap: {} });
         currentProperties = {}; // Czyszczenie właściwości
     });
+
 }
 
-// Funkcja do eksportowania danych do JSON
-function exportPropertiesToJson() {
+// Funkcja do pobierania JSON-a (istniejąca funkcjonalność)
+function downloadJson() {
     if (propertiesTable) {
-        propertiesTable.downloadData("selectedElementData.json", "json");
-        console.log("Eksport danych do JSON z tabeli właściwości.");
+      propertiesTable.downloadData("selectedElementData.json", "json");
+      console.log("Eksport danych do JSON z tabeli właściwości.");
     } else {
-        alert("Tabela właściwości nie została zainicjalizowana.");
-        console.error("Tabela właściwości jest niezainicjalizowana.");
+      alert("Tabela właściwości nie została zainicjalizowana.");
+      console.error("Tabela właściwości jest niezainicjalizowana.");
     }
+  }
+  
+// Nowa funkcja do wysyłania danych przez API
+function sendDataToApi() {
+if (Object.keys(currentProperties).length === 0) {
+    console.log("Brak danych do wysłania.");
+    alert("Najpierw wybierz element z właściwościami!");
+    return;
 }
 
-// Przypisanie event listener do przycisku
-document.getElementById("downloadJson").addEventListener("click", exportPropertiesToJson);
+const jsonData = JSON.stringify(currentProperties);
+fetch('http://localhost:5000/api/data', {
+    method: 'POST',
+    headers: {
+    'Content-Type': 'application/json',
+    },
+    body: jsonData,
+})
+.then(response => {
+    if (!response.ok) throw new Error('Błąd odpowiedzi serwera');
+    return response.json();
+})
+.then(data => {
+    console.log('Odpowiedź serwera:', data);
+    alert('Dane zostały pomyślnie wysłane!');
+})
+.catch(error => {
+    console.error('Błąd podczas wysyłania danych:', error);
+    alert('Wystąpił błąd: ' + error.message);
+});
+}
+
+// Przypisanie event listenerów do osobnych przycisków
+document.getElementById("downloadJson").addEventListener("click", downloadJson);
+document.getElementById("sendToApi").addEventListener("click", sendDataToApi);
 
 // Obsługa zdarzenia wyboru pliku z obsługą tabeli właściwości
 document.getElementById("ifcFile").addEventListener("change", async (event) => {
