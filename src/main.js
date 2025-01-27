@@ -98,6 +98,7 @@ async function setupElementProperties(model, components, world) {
         }
     
         console.log("Zaktualizowane właściwości:", currentProperties);
+        
     });
 
     highlighter.events.select.onClear.add(() => {
@@ -116,17 +117,17 @@ function downloadJson() {
       alert("Tabela właściwości nie została zainicjalizowana.");
       console.error("Tabela właściwości jest niezainicjalizowana.");
     }
-  }
+    
+    console.log("Dane z tabeli:", propertiesTable.data);
+}
   
 // Nowa funkcja do wysyłania danych przez API
 function sendDataToApi() {
-if (Object.keys(currentProperties).length === 0) {
-    console.log("Brak danych do wysłania.");
-    alert("Najpierw wybierz element z właściwościami!");
+if (!propertiesTable || !propertiesTable.data) {
+    alert("Tabela właściwości jest pusta!");
     return;
 }
-
-const jsonData = JSON.stringify(currentProperties);
+const jsonData = JSON.stringify(propertiesTable.data);
 fetch('http://localhost:5000/api/data', {
     method: 'POST',
     headers: {
@@ -146,6 +147,7 @@ fetch('http://localhost:5000/api/data', {
     console.error('Błąd podczas wysyłania danych:', error);
     alert('Wystąpił błąd: ' + error.message);
 });
+console.log("Dane z currentProperties:", currentProperties);
 }
 
 // Przypisanie event listenerów do osobnych przycisków
