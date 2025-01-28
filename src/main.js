@@ -14,40 +14,56 @@ const components = new OBC.Components();
 const ifcLoader = components.get(OBC.IfcLoader);
 
 let currentProperties = {}; // Zmienna globalna do przechowywania właściwości
+let propertiesTable; // Zmienna globalna, aby uzyskać dostęp do tabeli właściwości
+
+
+
+
+
+
+
+
+
 
 // Funkcja do konfiguracji i wczytania pliku IFC oraz inicjalizacji tabeli właściwości
 async function loadIfcWithProperties(file) {
     await ifcLoader.setup();
-
-    // Tworzenie podstawowych komponentów (Scena, Renderer, Kamera)
+  
+    // Inicjalizacja sceny, kamery, renderera
     const container = document.getElementById("container");
     const worlds = components.get(OBC.Worlds);
     const world = worlds.create();
-
+  
     world.scene = new OBC.SimpleScene(components);
     world.renderer = new OBC.SimpleRenderer(components, container);
     world.camera = new OBC.SimpleCamera(components);
-
+  
     components.init();
-
+  
     world.camera.controls.setLookAt(12, 6, 8, 0, 0, -10);
     world.scene.setup();
-
-    // Odczytanie zawartości pliku IFC
+  
+    // Wczytanie pliku IFC jako ArrayBuffer
     const buffer = await file.arrayBuffer();
     const uint8Array = new Uint8Array(buffer);
-
-    // Wczytanie modelu IFC
+  
+    // Załadowanie modelu IFC
     const model = await ifcLoader.load(uint8Array);
-
+  
     // Dodanie modelu do sceny
     world.scene.three.add(model);
-
-    // Konfiguracja tabeli właściwości elementów
+  
+    // Konfiguracja tabeli właściwości
     await setupElementProperties(model, components, world);
+  
+    // **NOWE** Wywołanie funkcji tworzącej drzewo relacji
+    await setupRelationsTree(model, components);
+  
+    // Dodanie siatki pomocniczej
+    const grids = components.get(OBC.Grids);
+    grids.create(world);
+    
 }
-
-let propertiesTable; // Zmienna globalna, aby uzyskać dostęp do tabeli właściwości
 
 // Funkcja do inicjalizacji tabeli właściwości
 async function setupElementProperties(model, components, world) {
@@ -107,6 +123,53 @@ async function setupElementProperties(model, components, world) {
     });
 
 }
+
+
+
+
+
+
+async function setupRelationsTree(model, components) {
+    // Pobieramy indexer relacji i przetwarzamy model
+    const indexer = components.get(OBC.IfcRelationsIndexer);
+    await indexer.process(model);
+  
+    // Tworzymy drzewo relacji (Relations Tree).
+    // Na początek ustawiamy pustą tablicę 'models', co pozwoli mu
+    // zaktualizować się automatycznie po dodaniu modelu.
+    const [relationsTree] = CUI.tables.relationsTree({
+      components,
+      models: [],
+    });
+  
+    // Opcjonalne ustawienia drzewa
+    relationsTree.preserveStructureOnFilter = true; // zachowaj zagnieżdżoną strukturę podczas filtrowania
+  
+    // Szukamy kontenera w HTML (np. <div id="relations"></div>)
+    const relationsContainer = document.getElementById("relations-tree-container");
+    if (!relationsContainer) {
+      console.warn('Nie znaleziono kontenera o id="relations-tree-container"');
+      return;
+    }
+  
+    // Czyścimy kontener i wstawiamy drzewo relacji
+    relationsContainer.innerHTML = "";
+    relationsContainer.appendChild(relationsTree);
+  
+    // (Opcjonalnie) Dodaj input do wyszukiwania w drzewie:
+    const searchInput = document.createElement("input");
+    searchInput.type = "text";
+    searchInput.placeholder = "Szukaj w drzewie relacji...";
+    searchInput.addEventListener("input", (event) => {
+      relationsTree.queryString = event.target.value;
+    });
+  
+    // Umieszczamy input nad drzewem
+    relationsContainer.prepend(searchInput);
+  
+    console.log("Drzewo relacji IFC zostało utworzone.");
+}
+  
 
 // Funkcja do pobierania JSON-a (istniejąca funkcjonalność)
 function downloadJson() {
