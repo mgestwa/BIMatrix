@@ -36,25 +36,35 @@ async function loadIfcWithProperties(file) {
     world.camera.controls.setLookAt(12, 6, 8, 0, 0, -10);
     world.scene.setup();
   
-    // Dodaj konfigurację Highlightera tutaj
-    // W funkcji loadIfcWithProperties:
-    const highlighter = components.get(OBF.Highlighter) || components.add(new OBF.Highlighter(components));
+    const highlighter = components.get(OBF.Highlighter);
     highlighter.setup({ world });
 
+    // Load model
     const buffer = await file.arrayBuffer();
-    const uint8Array = new Uint8Array(buffer);
-  
-    const model = await ifcLoader.load(uint8Array);
+    const model = await ifcLoader.load(new Uint8Array(buffer));
+    
+    // Add model to scene
     world.scene.three.add(model);
 
+    // Create separate models list component if needed
+    const [modelsList] = CUI.tables.modelsList({ components });
+    const modelsListContainer = document.getElementById("models-list-container");
+    if (modelsListContainer) {
+        modelsListContainer.innerHTML = "";
+        modelsListContainer.appendChild(modelsList);
+    }
+
+    // Set up components in sequence
     await setupElementProperties(model, components, world);
     await setupRelationsTree(model, components, world);
+    
+    return model;
 }
 
 // Funkcja do inicjalizacji tabeli właściwości
 async function setupElementProperties(model, components, world) {
-    const indexer = components.get(OBC.IfcRelationsIndexer);
-    await indexer.process(model);
+    //const indexer = components.get(OBC.IfcRelationsIndexer);
+    //await indexer.process(model);
 
     const [tableComponent, updatePropertiesTable] = CUI.tables.elementProperties({
         components,
@@ -111,56 +121,77 @@ async function setupElementProperties(model, components, world) {
 
 async function setupRelationsTree(model, components, world) {
     const indexer = components.get(OBC.IfcRelationsIndexer);
-    await indexer.process(model);
 
+    // Reset any existing data
+    indexer.onFragmentsDisposed({ ids: Object.keys(indexer.relationMaps) });
+
+    // Create relations tree before processing model
+    const [relationsTree] = CUI.tables.relationsTree({
+        components,
+        models: [],
+        rootName: "INP_ModelTest" // Dodaj nazwę root node'a
+    });
+
+    // Set up container
     const relationsContainer = document.getElementById("relations-tree-container");
     if (!relationsContainer) {
         console.warn('Nie znaleziono kontenera o id="relations-tree-container"');
         return;
     }
-
-    // Reset container
     relationsContainer.innerHTML = "";
-    const existingTree = relationsContainer.querySelector("ul");
-    if (existingTree) existingTree.remove();
 
-    // Initialize models
-    if (!window.existingModels) window.existingModels = new Set();
-    window.existingModels.add(model);
+    // Process model
+    console.log("Processing model...");
+    await indexer.process(model);
+    console.log("Model processed");
 
-    // Create relations tree
-    const [relationsTree] = CUI.tables.relationsTree({
-        components,
-        models: Array.from(window.existingModels || new Set([model])),
-    });
+    // Configure tree
     relationsTree.preserveStructureOnFilter = true;
+
+    // Create controls container
+    const controlsContainer = document.createElement("div");
+    controlsContainer.style.display = "flex";
+    controlsContainer.style.gap = "0.375rem";
+    controlsContainer.style.marginBottom = "10px";
 
     // Add search input
     const searchInput = document.createElement("input");
     searchInput.type = "text";
-    searchInput.placeholder = "Szukaj w drzewie relacji...";
+    searchInput.placeholder = "Search...";
+    searchInput.style.flex = "1";
     searchInput.addEventListener("input", (event) => {
         relationsTree.queryString = event.target.value;
     });
-    relationsContainer.prepend(searchInput, relationsTree);
+    controlsContainer.appendChild(searchInput);
 
+    // Add expand button
+    const expandButton = document.createElement("button");
+    expandButton.classList.add("expand-button");
+    expandButton.addEventListener("click", () => {
+        relationsTree.expanded = !relationsTree.expanded;
+    });
+    controlsContainer.appendChild(expandButton);
+
+    // Add elements to container
+    relationsContainer.appendChild(controlsContainer);
+    relationsContainer.appendChild(relationsTree);
+
+    // Setup highlighter
     try {
         const highlighter = components.get(OBF.Highlighter);
-        
-        // Add click event listener to the tree container
         relationsTree.addEventListener('click', (event) => {
-            // Find closest row element
             const row = event.target.closest('[data-id]');
             if (row) {
                 const id = row.dataset.id;
                 highlighter.highlight({ [id]: true });
-                console.log("Zaznaczono element:", id);
+                console.log("Selected element:", id);
             }
         });
-
     } catch (error) {
         console.error("Error in highlighter setup:", error);
     }
+
+    return relationsTree;
 }
 
 // Funkcja do pobierania JSON-a (istniejąca funkcjonalność)
