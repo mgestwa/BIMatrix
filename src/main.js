@@ -20,7 +20,6 @@ let propertiesTable; // Zmienna globalna, aby uzyskać dostęp do tabeli właśc
 async function loadIfcWithProperties(file) {
     await ifcLoader.setup();
   
-    // Inicjalizacja sceny, kamery, renderera
     const container = document.getElementById("container");
     const worlds = components.get(OBC.Worlds);
     const world = worlds.create();
@@ -37,20 +36,18 @@ async function loadIfcWithProperties(file) {
     world.camera.controls.setLookAt(12, 6, 8, 0, 0, -10);
     world.scene.setup();
   
-    // Wczytanie pliku IFC jako ArrayBuffer
+    // Dodaj konfigurację Highlightera tutaj
+    // W funkcji loadIfcWithProperties:
+    const highlighter = components.get(OBF.Highlighter) || components.add(new OBF.Highlighter(components));
+    highlighter.setup({ world });
+
     const buffer = await file.arrayBuffer();
     const uint8Array = new Uint8Array(buffer);
   
-    // Załadowanie modelu IFC
     const model = await ifcLoader.load(uint8Array);
-  
-    // Dodanie modelu do sceny
     world.scene.three.add(model);
-  
-    // Konfiguracja tabeli właściwości
+
     await setupElementProperties(model, components, world);
-  
-    // **Poprawione wywołanie funkcji setupRelationsTree**
     await setupRelationsTree(model, components, world);
 }
 
@@ -78,7 +75,6 @@ async function setupElementProperties(model, components, world) {
 
     // Inicjalizacja Highlightera
     const highlighter = components.get(OBF.Highlighter);
-    highlighter.setup({ world });
 
     highlighter.events.select.onHighlight.add(async (fragmentIdMap) => {
         updatePropertiesTable({ fragmentIdMap });
@@ -113,62 +109,59 @@ async function setupElementProperties(model, components, world) {
 
 }
 
-
-
-
-
-
 async function setupRelationsTree(model, components, world) {
     const indexer = components.get(OBC.IfcRelationsIndexer);
     await indexer.process(model);
 
-    // Sprawdzamy, czy już istnieje drzewo relacji
-    let existingTree = document.getElementById("relations-tree-container").querySelector("ul");
-    if (existingTree) {
-        console.warn("RelationsTree już istnieje. Nie tworzę nowego.");
-        return;
-    }
-
-    // Tworzymy drzewo relacji
-    const [relationsTree] = CUI.tables.relationsTree({
-        components,
-        models: [model],
-    });
-
-    relationsTree.preserveStructureOnFilter = true;
-
-    // Pobieramy kontener drzewa relacji
     const relationsContainer = document.getElementById("relations-tree-container");
     if (!relationsContainer) {
         console.warn('Nie znaleziono kontenera o id="relations-tree-container"');
         return;
     }
 
+    // Reset container
     relationsContainer.innerHTML = "";
-    relationsContainer.appendChild(relationsTree);
+    const existingTree = relationsContainer.querySelector("ul");
+    if (existingTree) existingTree.remove();
 
-    // Tworzymy pole do wyszukiwania
+    // Initialize models
+    if (!window.existingModels) window.existingModels = new Set();
+    window.existingModels.add(model);
+
+    // Create relations tree
+    const [relationsTree] = CUI.tables.relationsTree({
+        components,
+        models: Array.from(window.existingModels || new Set([model])),
+    });
+    relationsTree.preserveStructureOnFilter = true;
+
+    // Add search input
     const searchInput = document.createElement("input");
     searchInput.type = "text";
     searchInput.placeholder = "Szukaj w drzewie relacji...";
     searchInput.addEventListener("input", (event) => {
         relationsTree.queryString = event.target.value;
     });
+    relationsContainer.prepend(searchInput, relationsTree);
 
-    relationsContainer.prepend(searchInput);
+    try {
+        const highlighter = components.get(OBF.Highlighter);
+        
+        // Add click event listener to the tree container
+        relationsTree.addEventListener('click', (event) => {
+            // Find closest row element
+            const row = event.target.closest('[data-id]');
+            if (row) {
+                const id = row.dataset.id;
+                highlighter.highlight({ [id]: true });
+                console.log("Zaznaczono element:", id);
+            }
+        });
 
-    console.log("Drzewo relacji IFC zostało utworzone.");
-
-    // Powiązanie drzewa relacji z highlighterem
-    const highlighter = components.get(OBF.Highlighter);
-    highlighter.setup({ world });
-
-    relationsTree.events.select.onSelection.add((selection) => {
-        highlighter.highlight(selection); // Zaznacz element w modelu
-        console.log("Zaznaczono element:", selection);
-    });
+    } catch (error) {
+        console.error("Error in highlighter setup:", error);
+    }
 }
-  
 
 // Funkcja do pobierania JSON-a (istniejąca funkcjonalność)
 function downloadJson() {
