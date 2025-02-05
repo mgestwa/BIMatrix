@@ -22,7 +22,7 @@ api_key = os.getenv("OPENAI_API_KEY")
 try:
     service = OpenAIChatCompletion(
         service_id="chat-gpt",
-        ai_model_id="gpt-4o",
+        ai_model_id="gpt-4o",  # Upewnij się, że model jest odpowiedni dla Twojego zastosowania
         api_key=api_key
     )
     kernel.add_service(service)
@@ -40,40 +40,53 @@ def run_async(coro):
 def analyze_data():
     try:
         data = request.json
-        logging.debug(f"Dane: {json.dumps(data, indent=2)}")
-
-        # Konfiguracja promptu
+        logging.debug(f"Dane wejściowe: {json.dumps(data, indent=2)}")
+        
+        # Nowy prompt, który:
+        # Krok 1: Upraszcza dane każdego elementu, wyodrębniając kluczowe właściwości (np. Nazwa, Typ, Wymiary, Materiał).
+        # Krok 2: Na podstawie upraszczania generuje zestawienie ilościowe – liczbę elementów, główne typy, podsumowanie rozmiarów i materiałów.
         prompt_template_config = PromptTemplateConfig(
             template="""
-            [Jako ekspert BIM, przeanalizuj te elementy IFC:]
-            {{$input}}
-            
-            Podsumowanie:
-            - Liczba elementów: 
-            - Główne typy: 
-            - Wielkość lub średnica: 
-            - Materiał: 
+[Jako ekspert BIM, przeanalizuj poniższe dane elementów IFC.]
+
+Krok 1: Uprość dane wejściowe – dla każdego elementu wyodrębnij kluczowe właściwości, takie jak:
+  - Nazwa elementu
+  - Typ (np. IFCFLOWSEGMENT, itp.)
+  - Rodzina i typ
+  - Wymiary (np. wielkość, średnica)
+  - Materiał
+
+Krok 2: Na podstawie uproszczonych danych stwórz zestawienie ilościowe, zawierające:
+  - Całkowitą liczbę elementów
+  - Główne typy elementów wraz z ich ilością
+  - Podsumowanie rozmiarów (np. średnia wielkość lub zakres wymiarów)
+  - Rozkład materiałów
+
+Dane wejściowe:
+{{$input}}
+
+Odpowiedz w formacie JSON.
             """,
             input_variables=[
                 InputVariable(name="input", description="Dane IFC", is_required=True)
             ]
         )
 
-        # Utwórz funkcję z promptu
+        # Utworzenie funkcji na podstawie promptu
         analyze_function = KernelFunction.from_prompt(
-            function_name="AnalyzeIFC",
+            function_name="AnalyzeMultipleIFCElements",
             plugin_name="BIMAnalysis",
             prompt_template_config=prompt_template_config
         )
 
-        # Stwórz plugin i dodaj do kernela
+        # Utworzenie pluginu i dodanie do kernela
         plugin = KernelPlugin(name="BIMAnalysis", functions=[analyze_function])
         kernel.add_plugin(plugin)
 
-        # Przygotuj argumenty
+        # Przygotowanie argumentów – dane wejściowe (mogą to być np. lista elementów lub obiekt zawierający wiele elementów)
         arguments = KernelArguments(input=json.dumps(data, indent=2))
 
-        # Wywołaj funkcję
+        # Wywołanie funkcji asynchronicznie
         analysis = run_async(
             kernel.invoke(function=analyze_function, arguments=arguments)
         )
