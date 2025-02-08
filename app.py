@@ -22,13 +22,13 @@ api_key = os.getenv("OPENAI_API_KEY")
 try:
     service = OpenAIChatCompletion(
         service_id="chat-gpt",
-        ai_model_id="gpt-4o",  # Upewnij się, że model jest odpowiedni dla Twojego zastosowania
+        ai_model_id="gpt-4o",  # Upewnij się, że używasz właściwego modelu
         api_key=api_key
     )
     kernel.add_service(service)
     logging.info("✅ Usługa OpenAI skonfigurowana!")
 except Exception as e:
-    logging.error(f"❌ Błąd: {str(e)}")
+    logging.error(f"❌ Błąd konfiguracji usługi OpenAI: {str(e)}")
     exit(1)
 
 def run_async(coro):
@@ -36,68 +36,64 @@ def run_async(coro):
     asyncio.set_event_loop(loop)
     return loop.run_until_complete(coro)
 
-@app.route('/api/data', methods=['POST'])
-def analyze_data():
+@app.route('/api/simplify', methods=['POST'])
+def simplify_data():
     try:
         data = request.json
-        logging.debug(f"Dane wejściowe: {json.dumps(data, indent=2)}")
+        logging.debug(f"Dane wejściowe do uproszczenia: {json.dumps(data, indent=2)}")
         
-        # Nowy prompt, który:
-        # Krok 1: Upraszcza dane każdego elementu, wyodrębniając kluczowe właściwości (np. Nazwa, Typ, Wymiary, Materiał).
-        # Krok 2: Na podstawie upraszczania generuje zestawienie ilościowe – liczbę elementów, główne typy, podsumowanie rozmiarów i materiałów.
-        prompt_template_config = PromptTemplateConfig(
+        # Konfiguracja promptu do uproszczenia danych
+        simplify_prompt_config = PromptTemplateConfig(
             template="""
-[Jako ekspert BIM, przeanalizuj poniższe dane elementów IFC.]
+[Jako ekspert BIM, uprość dane elementów IFC.]
 
-Krok 1: Uprość dane wejściowe – dla każdego elementu wyodrębnij kluczowe właściwości, takie jak:
+Dla każdego elementu z poniższych danych wyodrębnij kluczowe właściwości:
   - Nazwa elementu
   - Typ (np. IFCFLOWSEGMENT, itp.)
   - Rodzina i typ
   - Wymiary (np. wielkość, średnica)
   - Materiał
 
-Krok 2: Na podstawie uproszczonych danych stwórz zestawienie ilościowe, zawierające:
-  - Całkowitą liczbę elementów
-  - Główne typy elementów wraz z ich ilością
-  - Podsumowanie rozmiarów (np. średnia wielkość lub zakres wymiarów)
-  - Rozkład materiałów
-
 Dane wejściowe:
 {{$input}}
 
-Odpowiedz w formacie JSON.
+Odpowiedz w formacie JSON, zawierając uproszczone dane dla każdego elementu.
             """,
             input_variables=[
                 InputVariable(name="input", description="Dane IFC", is_required=True)
             ]
         )
-
-        # Utworzenie funkcji na podstawie promptu
-        analyze_function = KernelFunction.from_prompt(
-            function_name="AnalyzeMultipleIFCElements",
-            plugin_name="BIMAnalysis",
-            prompt_template_config=prompt_template_config
+        
+        # Utworzenie funkcji upraszczającej
+        simplify_function = KernelFunction.from_prompt(
+            function_name="SimplifyIFCData",
+            plugin_name="BIMSimplification",
+            prompt_template_config=simplify_prompt_config
         )
-
+        
         # Utworzenie pluginu i dodanie do kernela
-        plugin = KernelPlugin(name="BIMAnalysis", functions=[analyze_function])
-        kernel.add_plugin(plugin)
-
-        # Przygotowanie argumentów – dane wejściowe (mogą to być np. lista elementów lub obiekt zawierający wiele elementów)
-        arguments = KernelArguments(input=json.dumps(data, indent=2))
-
+        plugin_simplify = KernelPlugin(name="BIMSimplification", functions=[simplify_function])
+        kernel.add_plugin(plugin_simplify)
+        
+        # Przygotowanie argumentów – przekazujemy dane wejściowe w formacie JSON
+        arguments_simplify = KernelArguments(input=json.dumps(data, indent=2))
+        
         # Wywołanie funkcji asynchronicznie
-        analysis = run_async(
-            kernel.invoke(function=analyze_function, arguments=arguments)
+        simplified_result = run_async(
+            kernel.invoke(function=simplify_function, arguments=arguments_simplify)
         )
-
+        
+        # Jeśli wynik posiada atrybut `result`, używamy go; w przeciwnym razie konwertujemy cały wynik do stringa.
+        result_text = getattr(simplified_result, "result", str(simplified_result))
+        logging.debug(f"Wynik uproszczenia: {result_text}")
+        
         return jsonify({
             "status": "success",
-            "analysis": str(analysis)
+            "simplified_data": result_text
         })
-
+    
     except Exception as e:
-        logging.error(f"💥 Błąd: {str(e)}", exc_info=True)
+        logging.error(f"Błąd podczas uproszczania danych: {str(e)}", exc_info=True)
         return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == '__main__':
