@@ -289,3 +289,68 @@ document.getElementById("ifcFile").addEventListener("change", async (event) => {
         console.error("Nie wybrano pliku.");
     }
 });
+
+// Update the queryRagDatabase function with better error handling
+async function queryRagDatabase() {
+    if (!propertiesTable || !propertiesTable.data) {
+        alert("Brak danych do przeanalizowania!");
+        return;
+    }
+
+    const query = prompt("Wprowadź zapytanie dotyczące modelu:");
+    if (!query) return;
+
+    try {
+        const response = await fetch('http://localhost:5000/api/query', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify({
+                query: query,
+                modelData: propertiesTable.data
+            }),
+        });
+
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.message || 'Błąd odpowiedzi serwera');
+        }
+        
+        console.log('Odpowiedź RAG:', data);
+        
+        // Create modal to display response
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            max-width: 80%;
+            max-height: 80%;
+            overflow-y: auto;
+            z-index: 1000;
+        `;
+
+        modal.innerHTML = `
+            <h3>Odpowiedź asystenta:</h3>
+            <p>${data.answer}</p>
+            <button onclick="this.parentElement.remove()" style="margin-top: 10px;">Zamknij</button>
+        `;
+
+        document.body.appendChild(modal);
+
+    } catch (error) {
+        console.error('Błąd podczas zapytania RAG:', error);
+        alert('Wystąpił błąd: ' + error.message);
+    }
+}
+
+// Add button event listener
+document.getElementById("queryRag").addEventListener("click", queryRagDatabase);
