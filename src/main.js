@@ -290,7 +290,41 @@ document.getElementById("ifcFile").addEventListener("change", async (event) => {
     }
 });
 
-// Update the queryRagDatabase function with better error handling
+// Add new function to build RAG database
+async function buildRagDatabase() {
+    if (!propertiesTable || !propertiesTable.data) {
+        alert("Brak danych do przeanalizowania!");
+        return;
+    }
+
+    try {
+        const response = await fetch('http://localhost:5000/api/build-rag', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify({
+                modelData: propertiesTable.data
+            }),
+        });
+
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.message || 'Błąd odpowiedzi serwera');
+        }
+        
+        console.log('Baza RAG zbudowana:', data);
+        return true;
+    } catch (error) {
+        console.error('Błąd podczas budowania bazy RAG:', error);
+        alert('Wystąpił błąd: ' + error.message);
+        return false;
+    }
+}
+
+// Update the queryRagDatabase function
 async function queryRagDatabase() {
     if (!propertiesTable || !propertiesTable.data) {
         alert("Brak danych do przeanalizowania!");
@@ -308,8 +342,7 @@ async function queryRagDatabase() {
                 'Accept': 'application/json',
             },
             body: JSON.stringify({
-                query: query,
-                modelData: propertiesTable.data
+                query: query
             }),
         });
 
@@ -352,5 +385,63 @@ async function queryRagDatabase() {
     }
 }
 
-// Add button event listener
-document.getElementById("queryRag").addEventListener("click", queryRagDatabase);
+// Update event listener to handle database state
+document.getElementById("queryRag").addEventListener("click", async () => {
+    try {
+        const userQuery = prompt("Wprowadź zapytanie dotyczące modelu:");
+        console.log("🤔 Zapytanie użytkownika:", userQuery);
+
+        const response = await fetch('http://localhost:5000/api/query', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                query: userQuery
+            }),
+        });
+
+        const data = await response.json();
+        
+        if (response.status === 400 && data.message.includes('not built')) {
+            console.log("🏗️ Baza RAG nie istnieje, rozpoczynam budowanie...");
+            const buildSuccess = await buildRagDatabase();
+            if (buildSuccess) {
+                console.log("✅ Baza RAG zbudowana pomyślnie, ponawiam zapytanie...");
+                await queryRagDatabase();
+            }
+        } else if (!response.ok) {
+            throw new Error(data.message || 'Błąd odpowiedzi serwera');
+        } else {
+            console.log("🤖 Odpowiedź asystenta:", data.answer);
+            
+            // Display response in modal
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: white;
+                padding: 20px;
+                border-radius: 8px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                max-width: 80%;
+                max-height: 80%;
+                overflow-y: auto;
+                z-index: 1000;
+            `;
+
+            modal.innerHTML = `
+                <h3>Odpowiedź asystenta:</h3>
+                <p>${data.answer}</p>
+                <button onclick="this.parentElement.remove()" style="margin-top: 10px;">Zamknij</button>
+            `;
+
+            document.body.appendChild(modal);
+        }
+    } catch (error) {
+        console.error('❌ Błąd:', error);
+        alert('Wystąpił błąd: ' + error.message);
+    }
+});

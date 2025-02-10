@@ -18,15 +18,10 @@ CORS(app, resources={
     }
 })
 
-# Global variables for kernel and memory store
-kernel = None
-memory_store = None
-
-# Initialize before first request instead of every request
-@app.before_request
-def initialize():
-    global kernel, memory_store
-    kernel, memory_store = initialize_kernel()
+# Initialize kernel and memory_store at module level
+kernel, memory_store = initialize_kernel()
+# Flag to track if RAG database is built
+rag_database_built = False
 
 @app.route('/api/simplify', methods=['POST'])
 def simplify_data():
@@ -43,17 +38,17 @@ def simplify_data():
             'message': str(e)
         }), 500
 
-@app.route('/api/query', methods=['POST'])
-def query_rag_handler():
+@app.route('/api/build-rag', methods=['POST'])
+def build_rag_handler():
+    global rag_database_built
     try:
         data = request.json
-        query = data.get('query')
         model_data = data.get('modelData')
 
-        if not query or not model_data:
+        if not model_data:
             return jsonify({
                 'status': 'error',
-                'message': 'Missing query or model data'
+                'message': 'Missing model data'
             }), 400
 
         # Run async operations in a synchronous context
@@ -63,8 +58,42 @@ def query_rag_handler():
         # Process the data and build RAG database
         simplified_data = process_json_data(model_data)
         loop.run_until_complete(build_rag_database(simplified_data, memory_store))
+        loop.close()
 
-        # Query the RAG database
+        rag_database_built = True  # Set flag after successful build
+
+        return jsonify({
+            'status': 'success',
+            'message': 'RAG database built successfully'
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@app.route('/api/query', methods=['POST'])
+def query_rag_handler():
+    global rag_database_built
+    try:
+        if not rag_database_built:
+            return jsonify({
+                'status': 'error',
+                'message': 'RAG database not built yet. Please build it first.'
+            }), 400
+
+        data = request.json
+        query = data.get('query')
+
+        if not query:
+            return jsonify({
+                'status': 'error',
+                'message': 'Missing query'
+            }), 400
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
         answer = loop.run_until_complete(query_ifc_model(kernel, memory_store, query))
         loop.close()
 
