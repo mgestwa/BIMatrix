@@ -4,63 +4,257 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>BIMatrix</title>
-  <link rel="stylesheet" href="./styles.css" />
-
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <style>
-    #downloadJson {
-      background-color: #4CAF50;
+    :root {
+      --primary-color: #6B2FD9;
+      --primary-dark: #5B28B8;
+      --accent-color: #FF1F8E;
+      --accent-hover: #FF3F9E;
+      --text-color: #212121;
+      --secondary-text: #757575;
+      --divider-color: #BDBDBD;
+      --background: #F8F7FC;
+      --card-background: #FFFFFF;
+      --elevation-2: 0 2px 2px 0 rgba(0,0,0,0.14), 
+                    0 3px 1px -2px rgba(0,0,0,0.12), 
+                    0 1px 5px 0 rgba(0,0,0,0.2);
     }
 
-    #sendToApi {
-      background-color: #008CBA;
+    body {
+      font-family: 'Roboto', sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: var(--background);
+      color: var(--text-color);
     }
 
-    #downloadAllJson {
-      background-color: #008CBA;
-    }
-
-    /* Stylowanie kontenera dla divów obok siebie */
-    .properties-container {
+    .header {
       display: flex;
-      gap: 10px;
-      margin-top: 10px;
+      align-items: center;
+      margin-bottom: 20px;
+      background-color: var(--card-background);
+      padding: 16px 48px;
+      border-radius: 4px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      background: linear-gradient(135deg, rgba(107, 47, 217, 0.02), rgba(255, 31, 142, 0.02));
+      border: 1px solid rgba(107, 47, 217, 0.08);
     }
 
-    #relations-tree-container, #properties {
-      flex: 1;
-      height: 400px;
-      overflow: auto;
-      border: 1px solid #ccc;
-      padding: 10px;
+    .logo {
+      height: 120px;
+      display: flex;
+      align-items: center;
+      gap: 1px;
+    }
+
+    .logo img {
+      height: 110px;
+      width: auto;
+      object-fit: contain;
+      padding: 5px;
+      transform: scale(1.6);
+    }
+
+    .logo-text {
+      font-size: 38px;
+      font-weight: 500;
+      color: #6B2FD9;
+      letter-spacing: 0.2px;
+      margin-left: 24px;
+      white-space: nowrap;
+      text-shadow: 0 1px 2px rgba(107, 47, 217, 0.1);
+    }
+
+    .toolbar {
+      background-color: var(--card-background);
+      padding: 16px;
+      margin-bottom: 20px;
+      border-radius: 4px;
+      box-shadow: var(--elevation-2);
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+      background: linear-gradient(135deg, rgba(107, 47, 217, 0.03), rgba(255, 31, 142, 0.03));
+    }
+
+    .file-input-wrapper {
+      position: relative;
+      display: inline-block;
+      cursor: pointer;
+    }
+
+    .file-input-wrapper input[type="file"] {
+      position: absolute;
+      left: 0;
+      top: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+      z-index: 2;
+    }
+
+    .file-input-wrapper .button {
+      pointer-events: none;
+    }
+
+    .button {
+      background-color: var(--primary-color);
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      position: relative;
+      z-index: 1;
+      overflow: hidden;
+    }
+
+    .button:hover {
+      background-color: var(--primary-dark);
+      transform: translateY(-1px);
+      box-shadow: var(--elevation-2);
+    }
+
+    .button.accent {
+      background-color: var(--accent-color);
+      box-shadow: 0 2px 4px rgba(255, 31, 142, 0.2);
+    }
+
+    .button.accent:hover {
+      background-color: var(--accent-hover);
+      box-shadow: 0 4px 8px rgba(255, 31, 142, 0.3);
+      transform: translateY(-1px);
+    }
+
+    .button i {
+      font-size: 18px;
     }
 
     #container {
       width: 100%;
       height: 500px;
+      background-color: var(--card-background);
+      border-radius: 4px;
+      box-shadow: var(--elevation-2);
+      margin-bottom: 20px;
+      border: 1px solid rgba(107, 47, 217, 0.1);
+    }
+
+    .properties-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-top: 20px;
+    }
+
+    .card {
+      background-color: var(--card-background);
+      border-radius: 4px;
+      box-shadow: var(--elevation-2);
+      padding: 16px;
+      border: 1px solid rgba(107, 47, 217, 0.1);
+      transition: box-shadow 0.3s;
+    }
+
+    .card:hover {
+      box-shadow: 0 4px 12px rgba(107, 47, 217, 0.08);
+    }
+
+    .card h3 {
+      margin: 0 0 16px 0;
+      font-size: 16px;
+      font-weight: 500;
+      color: var(--primary-color);
+      border-bottom: 2px solid rgba(107, 47, 217, 0.1);
+      padding-bottom: 8px;
+    }
+
+    #relations-tree-container, #properties {
+      height: 400px;
+      overflow: auto;
+    }
+
+    /* Stylowanie scrollbara */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--primary-dark);
     }
   </style>
 </head>
 <body>
-  <input type="file" id="ifcFile" accept=".ifc" />
-  <button id="downloadJson">Pobierz JSON</button>
-  <button id="sendToApi">Wyślij dane do API</button>
-  <button id="simplifyData">Uprość dane</button>
-  <button id="queryRag" class="button">Zapytaj o model</button>
+  <div class="header">
+    <div class="logo">
+      <img src="./img/AIFC.CLOUD.LOGO.png" alt="BIMatrix Logo">
+      <span class="logo-text">AIFC.CLOUD</span>
+    </div>
+  </div>
 
+  <div class="toolbar">
+    <div class="file-input-wrapper">
+      <label class="button" for="ifcFile">
+        <i class="material-icons">upload_file</i>
+        Wybierz plik IFC
+      </label>
+      <input type="file" id="ifcFile" accept=".ifc" />
+    </div>
+    
+    <button id="downloadJson" class="button">
+      <i class="material-icons">download</i>
+      Pobierz JSON
+    </button>
+    
+    <button id="sendToApi" class="button">
+      <i class="material-icons">send</i>
+      Wyślij do API
+    </button>
+    
+    <button id="simplifyData" class="button">
+      <i class="material-icons">auto_fix_high</i>
+      Uprość dane
+    </button>
+    
+    <button id="queryRag" class="button accent">
+      <i class="material-icons">psychology</i>
+      Zapytaj o model
+    </button>
+  </div>
 
-  
   <div id="container"></div>
 
   <div class="properties-container">
-    <div id="properties">
-      <h3>Właściwości elementu:</h3>
+    <div class="card" id="properties">
+      <h3>Właściwości elementu</h3>
     </div>
-    <div id="relations-tree-container">
-      <h3>Drzewo relacji:</h3>
+    <div class="card" id="relations-tree-container">
+      <h3>Drzewo relacji</h3>
     </div>
-
   </div>
-  <div id="models-list-container"></div>
 
   <script type="module" src="./src/main.js"></script>
 </body>
